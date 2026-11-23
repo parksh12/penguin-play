@@ -1,0 +1,51 @@
+# parksh12/penguin-play 저장소의 .github/workflows/deploy.yml 로 넣을 파일 (P2-77, 03팀 준비 · 푸시하지 않음)
+# 펭귄 오락실(play.penguintools.kr) 배포: 공개 저장소 parksh12/sehwa를 받아 오락실 모드로 빌드하고 dist-play만 올림.
+# 토큰·시크릿·저장소 변수 필요 없음(sehwa는 공개 저장소, 애드센스·GA ID는 sehwa config.mjs 기본값을 그대로 씀).
+# 실행: 매일 한국 시간 00:01(오늘의 띠별 운세 갱신) + 수동 실행(Actions → deploy-play → Run workflow).
+# 주의: sehwa에 새 코드를 올려도 오락실은 다음 00:01이나 수동 실행 때 반영됩니다.
+name: deploy-play
+
+on:
+  schedule:
+    - cron: "1 15 * * *" # UTC 15:01 = KST 00:01
+  workflow_dispatch:
+  push:
+    branches: [main] # 이 저장소(README 등)를 고칠 때도 다시 배포
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: parksh12/sehwa
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node build.mjs
+        env:
+          SITE_URL: https://penguintools.kr
+          PLAY_URL: https://play.penguintools.kr
+      - run: test -f dist-play/index.html && test -f dist-play/sitemap.xml # 오락실 결과물이 없으면 배포하지 않음
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-play
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
